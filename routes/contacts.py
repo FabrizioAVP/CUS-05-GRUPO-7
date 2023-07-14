@@ -13,54 +13,15 @@ def index():
     contacts_predio_mdu = predio_mdu.query.all()
     contacts_casa = casa.query.all()
 
-    # Conectarse a la base de datos
-    engine = create_engine('postgresql://modulo4:modulo4@137.184.120.127:5432/sigcon')
-    connection = engine.connect()
+    # Obtener los valores de id_predio y descripcion de la tabla predio ordenados por id_predio
+    id_predios = [{'id_predio': item.id_predio, 'descripcion': item.descripcion} for item in predio.query.order_by(predio.id_predio).all()]
 
-    # Obtener los valores de id_predio y descripcion de la tabla predio
-    query = text('SELECT id_predio, descripcion FROM predio ORDER BY id_predio ASC')
-    result = connection.execute(query)
-    id_predios = [{'id_predio': row[0], 'descripcion': row[1]} for row in result.fetchall()]
+    # Obtener el valor seleccionado de id_predio de la variable de sesión
+    selected_id_predio = session.get('selected_id_predio')
 
-    # Cerrar la conexión a la base de datos
-    connection.close()
-    engine.dispose()
-    return render_template('index.html', contacts_predio=contacts_predio, contacts_predio_area_comun=contacts_predio_area_comun, contacts_predio_mdu=contacts_predio_mdu, contacts_casa=contacts_casa,id_predios=id_predios, data_ArCm=data_ArCm, data_Mdu=data_Mdu, data_Casa=data_Casa)
-
-################################################ AGREGAR
-
-data_Predio = []
-
-@contacts.route('/new/predio', methods=['POST'])
-def add_predio():
-    #predio
-    # Obtener el último ID de predio registrado
-    last_predio = db.session.query(func.max(predio.id_predio)).scalar()
-    # Incrementar el último ID de predio para obtener el siguiente
-    new_id_predio = last_predio + 1 if last_predio else 1    
-
-    id_tipo_predio=request.form['id_tipo_predio']
-    descripcion=request.form['descripcion']
-    ruc=request.form['ruc']
-    telefono=request.form['telefono']
-    correo=request.form['correo']
-    direccion=request.form['direccion']
-    idubigeo=request.form['idubigeo']
-    new_contact = predio(new_id_predio,id_tipo_predio,descripcion,ruc,telefono,correo,direccion,idubigeo)
-    db.session.add(new_contact)
-    db.session.commit()
-
-    # Verificar si los campos tienen valores
-    if id_tipo_predio and descripcion and ruc and telefono and correo and direccion and idubigeo:
-        # Agregar una nueva fila a la lista de datos
-        row = [id_tipo_predio,descripcion,ruc,telefono,correo,direccion,idubigeo]
-        data_Predio.append(row)
-
-    flash("Predio añadido satisfactoriamente!")
-    return render_template('index.html', data_Predio=data_Predio)
-
-###############################################################################################################
-
+    return render_template('index.html', contacts_predio=contacts_predio, contacts_predio_area_comun=contacts_predio_area_comun,
+                           contacts_predio_mdu=contacts_predio_mdu, contacts_casa=contacts_casa, id_predios=id_predios,
+                           selected_id_predio=selected_id_predio, data_Mdu=data_Mdu, data_Casa=data_Casa, data_ArCm=data_ArCm)
 
 ###############################################################################################################
 
@@ -69,90 +30,99 @@ data_ArCm = []
 @contacts.route('/new/predio_area_comun', methods=['POST','GET'])
 def add_predio_area_comun():
     # Obtener el último ID de predio registrado
-    id_predio = int(request.form['id_predio'])
-    #id_predio = db.session.query(func.max(predio.id_predio)).scalar()
-    id_area_comun=request.form['id_area_comun']
-    codigo=request.form['codigo']
-    area=request.form['area']
-    new_contact = predio_area_comun(id_predio,id_area_comun,codigo,area)
-    db.session.add(new_contact)
-    db.session.commit()
+    id_predio = int(request.form['id_predio']) if request.form['id_predio'] else None
+    id_area_comun = request.form['id_area_comun']
+    codigo = request.form['codigo']
+    area = request.form['area']
 
+     # Verificar si ya existe una fila con la misma combinación de id_predio e id_area_comun
+    existing_area = predio_area_comun.query.filter_by(id_predio=id_predio, id_area_comun=id_area_comun).first()
+    if existing_area:
+        # Si existe, mostrar un mensaje indicando que ya existe
+        flash('Este tipo de área común ya existe', 'error')
+    else:
+        # Si no existe, agregar los datos a la base de datos
+        new_contact = predio_area_comun(id_predio, id_area_comun, codigo, area)
+        db.session.add(new_contact)
+        db.session.commit()
+        
+        # Verificar si los campos tienen valores
+        if id_predio and id_area_comun and codigo and area:
+            # Agregar una nueva fila a la lista de datos
+            row = [id_predio, id_area_comun, codigo, area]
+            data_ArCm.append(row)
     
+        flash("Predio de Area Comun añadido satisfactoriamente!")
 
-    # Verificar si los campos tienen valores
-    if id_area_comun and codigo and area:
-        # Agregar una nueva fila a la lista de datos
-        row = [id_predio,id_area_comun, codigo, area]
-        data_ArCm.append(row)
-
-    flash("Predio de Area Comun añadido satisfactoriamente!")
-    return redirect(url_for('contacts.index', data_ArCm=data_ArCm))
+    # Guardar el valor seleccionado en la variable de sesión
+        session['selected_id_predio'] = id_predio
+    return redirect(url_for('contacts.index'))
     #return render_template('index.html', data_ArCm=data_ArCm)
 
 data_Mdu = []
 
-@contacts.route('/new/predio_mdu', methods=['POST'])
+@contacts.route('/new/predio_mdu', methods=['POST', 'GET'])
 def add_predio_mdu():
-    #predio_mdu
     # Obtener el último ID de predio registrado
     last_mdu = db.session.query(func.max(predio_mdu.id_predio_mdu)).scalar()
     # Incrementar el último ID de predio para obtener el siguiente
     new_id_mdu = last_mdu + 1 if last_mdu else 1
-    # Obtener el último ID de predio registrado
+
     id_predio = int(request.form['id_predio'])
-    id_mdu=request.form['id_mdu']
-    descripcion=request.form['descripcion']
-    direccion=request.form['direccion']
-    numero=request.form['numero']
-    new_contact = predio_mdu(new_id_mdu,id_predio,id_mdu,descripcion,direccion,numero)
+    id_mdu = request.form['id_mdu']
+    descripcion = request.form['descripcion']
+    direccion = request.form['direccion']
+    numero = request.form['numero']
+    new_contact = predio_mdu(new_id_mdu, id_predio, id_mdu, descripcion, direccion, numero)
     db.session.add(new_contact)
     db.session.commit()
+
+    # Guardar el valor seleccionado en la variable de sesión
+    session['selected_id_predio'] = id_predio
 
     # Verificar si los campos tienen valores
     if id_predio and id_mdu and descripcion and direccion and numero:
         # Agregar una nueva fila a la lista de datos
-        row = [id_predio,id_mdu,descripcion,direccion,numero]
+        row = [id_predio, id_mdu, descripcion, direccion, numero]
         data_Mdu.append(row)
 
     flash("Predio MDU añadido satisfactoriamente!")
-    return redirect(url_for('contacts.index', data_Mdu=data_Mdu))
+    return redirect(url_for('contacts.index'))
     #return render_template('index.html', data_Mdu=data_Mdu)
     
 
 data_Casa = []
 
-@contacts.route('/new/casa', methods=['POST'])
+@contacts.route('/new/casa', methods=['POST','GET'])
 def add_casa():
-    #casa
     # Obtener el último ID de predio registrado
     last_casa = db.session.query(func.max(casa.id_casa)).scalar()
     # Incrementar el último ID de predio para obtener el siguiente
     new_id_casa = last_casa + 1 if last_casa else 1
 
     id_predio = int(request.form['id_predio'])
-    id_estado=request.form['id_estado']
+    id_estado = request.form['id_estado']
     id_predio_mdu = id_predio_mdu = db.session.query(func.max(predio_mdu.id_predio_mdu)).scalar()
-    numero=request.form['numero']#Agregar que inicie desde el 1 ?
-    piso=request.form['piso']
-    area=request.form['area']
-    participacion=request.form['participacion']
-    new_contact = casa(new_id_casa,id_predio,id_estado,id_predio_mdu,numero,piso,area,participacion)
+    numero = request.form['numero']
+    piso = request.form['piso']
+    area = request.form['area']
+    participacion = request.form['participacion']
+    new_contact = casa(new_id_casa, id_predio, id_estado, id_predio_mdu, numero, piso, area, participacion)
     db.session.add(new_contact)
     db.session.commit()
+
+    # Guardar el valor seleccionado en la variable de sesión
+    session['selected_id_predio'] = id_predio
 
     # Verificar si los campos tienen valores
     if id_predio and id_estado and id_predio_mdu and numero and piso and area and participacion:
         # Agregar una nueva fila a la lista de datos
-        row = [id_predio,id_estado,id_predio_mdu,numero,piso,area,participacion]
+        row = [id_predio, id_estado, id_predio_mdu, numero, piso, area, participacion]
         data_Casa.append(row)
 
     flash("Casa añadida satisfactoriamente!")
-    return redirect(url_for('contacts.index', data_Casa=data_Casa))
+    return redirect(url_for('contacts.index'))
     #return render_template('index.html', data_Casa=data_Casa)
-
-    
-    
 
 ################################################ ACTUALIZAR
 @contacts.route('/update/predio/<id>', methods = ['POST','GET'])

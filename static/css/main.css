@@ -1,8 +1,12 @@
 body {
-  background: white; /* Azul indigo */
+  background-image: url(fondo1.jpg);
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-attachment: fixed;
 }
 
 .bg-black {
-  background:  #1C4C96  !important; /* Azul indigo */
+  background-color: #1c4d9663 !important; /* Azul indigo */
 }
+
 
